@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import CameraView from '../views/CameraView.vue'
+import CameraManageView from '../views/CameraManageView.vue'
 import LoginView from '../views/LoginView.vue'
 import EmployeeView from '../views/EmployeeView.vue'
 import { useToast } from '@/composables/useToast'
@@ -28,6 +29,12 @@ const router = createRouter({
       path: '/employee',
       name: 'employee',
       component: EmployeeView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/cameras',
+      name: 'cameras',
+      component: CameraManageView,
       meta: { requiresAuth: true },
     },
   ],
