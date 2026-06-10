@@ -7,7 +7,7 @@
     <div class="topbar">
       <div class="page-info">
         <h2 class="page-title">Employees</h2>
-        <span class="count-badge">{{ employees.length }} total</span>
+        <span class="count-badge">{{ employees.filter(e => e.empId !== 1111).length }} total</span>
       </div>
       <div class="topbar-right">
         <div class="search-wrap">
@@ -39,23 +39,19 @@
               No employees found
             </td>
           </tr>
-          <tr v-for="emp in filtered" :key="emp.emp_id" class="emp-row">
+          <tr v-for="emp in filtered" :key="emp.empId" class="emp-row">
             <td>
               <div class="emp-cell">
                 <div class="emp-avatar" :style="avatarStyle(emp.name)">
-                  <img v-if="emp.photoUrl" :src="emp.photoUrl" class="avatar-img" />
-                  <span v-else>{{ initials(emp.name) }}</span>
+                  <span>{{ initials(emp.name) }}</span>
                 </div>
                 <span class="emp-name">{{ emp.name }}</span>
               </div>
             </td>
-            <td class="cell-id">{{ emp.emp_id }}</td>
-            <td><span class="role-badge" :class="roleBadgeClass(emp.role_name)">{{ emp.role_name }}</span></td>
+            <td class="cell-id">{{ emp.empId }}</td>
+            <td><span class="role-badge" :class="roleBadgeClass(emp.role)">{{ emp.role }}</span></td>
             <td>
-              <span v-if="emp.photoUrl" class="photo-status has-photo">
-                <i class="ti ti-photo-check"></i> Uploaded
-              </span>
-              <span v-else class="photo-status no-photo">
+              <span class="photo-status no-photo">
                 <i class="ti ti-photo-off"></i> None
               </span>
             </td>
@@ -115,26 +111,27 @@
             >
               <i class="ti ti-trash"></i> Remove photo
             </button>
+            <span v-if="errors.photo" class="error-msg">{{ errors.photo }}</span>
           </div>
 
           <!-- Fields -->
           <div class="fields">
 
             <div class="field">
-              <label class="label" for="emp_id">Employee ID</label>
-              <div class="input-wrap" :class="{ error: errors.emp_id, focused: focused === 'emp_id' }">
+              <label class="label" for="empId">Employee ID</label>
+              <div class="input-wrap" :class="{ error: errors.empId, focused: focused === 'empId' }">
                 <i class="ti ti-id-badge input-icon"></i>
                 <input
-                  id="emp_id"
-                  v-model="form.emp_id"
+                  id="empId"
+                  v-model="form.empId"
                   class="input"
                   placeholder="e.g. EMP001"
                   :disabled="!!editing"
-                  @focus="focused = 'emp_id'"
+                  @focus="focused = 'empId'"
                   @blur="focused = null"
                 />
               </div>
-              <span v-if="errors.emp_id" class="error-msg">{{ errors.emp_id }}</span>
+              <span v-if="errors.empId" class="error-msg">{{ errors.empId }}</span>
             </div>
 
             <div class="field">
@@ -155,31 +152,106 @@
 
             <div class="field">
               <label class="label" for="role">Role</label>
-              <div class="input-wrap" :class="{ error: errors.role_name, focused: focused === 'role' }">
-                <i class="ti ti-briefcase input-icon"></i>
-                <select
-                  id="role"
-                  v-model="form.role_name"
-                  class="input select"
-                  @focus="focused = 'role'"
-                  @blur="focused = null"
-                >
-                  <option value="" disabled>Select a role</option>
-                  <option v-for="r in ROLES" :key="r" :value="r">{{ r }}</option>
-                </select>
-                <i class="ti ti-chevron-down select-arrow"></i>
+
+              <!-- Loading -->
+              <div v-if="rolesLoading" class="input-wrap roles-state">
+                <span class="spinner-sm"></span>
+                <span class="state-text">Loading roles…</span>
               </div>
-              <span v-if="errors.role_name" class="error-msg">{{ errors.role_name }}</span>
+
+              <!-- Error -->
+              <div v-else-if="rolesError" class="input-wrap roles-state roles-error">
+                <i class="ti ti-alert-circle state-icon"></i>
+                <span class="state-text">Failed to load roles</span>
+                <button type="button" class="btn-retry" @click="fetchRoles">Retry</button>
+              </div>
+
+              <!-- Custom dropdown -->
+              <div v-else ref="dropdownRef" class="dropdown" :class="{ open: dropdownOpen, error: errors.role }">
+                <button
+                  type="button"
+                  class="dropdown-trigger"
+                  @click="dropdownOpen = !dropdownOpen"
+                >
+                  <i class="ti ti-briefcase input-icon"></i>
+                  <span :class="form.role ? 'dropdown-value' : 'dropdown-placeholder'">
+                    {{ form.role || 'Select a role' }}
+                  </span>
+                  <i class="ti ti-chevron-down dropdown-arrow"></i>
+                </button>
+                <ul v-if="dropdownOpen" class="dropdown-list">
+                  <li
+                    v-for="r in roles"
+                    :key="r.roleName"
+                    class="dropdown-item"
+                    :class="{ selected: form.role === r.roleName }"
+                    @mousedown.prevent="selectRole(r.roleName)"
+                  >
+                    <i v-if="form.role === r.roleName" class="ti ti-check check-icon"></i>
+                    {{ r.roleName }}
+                    <span v-if="r.isSystem" class="system-badge">System</span>
+                  </li>
+                </ul>
+              </div>
+
+              <span v-if="errors.role" class="error-msg">{{ errors.role }}</span>
             </div>
+
+            <!-- Password — shown only when selected role is isSystem -->
+            <Transition name="fade">
+              <div v-if="selectedRole?.isSystem" class="field">
+                <label class="label" for="password">Password</label>
+                <div class="input-wrap" :class="{ error: errors.password, focused: focused === 'password' }">
+                  <i class="ti ti-lock input-icon"></i>
+                  <input
+                    id="password"
+                    v-model="form.password"
+                    :type="showPassword ? 'text' : 'password'"
+                    class="input"
+                    placeholder="Set a system password"
+                    @focus="focused = 'password'"
+                    @blur="focused = null"
+                  />
+                  <button type="button" class="eye-btn" @click="showPassword = !showPassword" tabindex="-1">
+                    <i :class="showPassword ? 'ti ti-eye-off' : 'ti ti-eye'"></i>
+                  </button>
+                </div>
+                <span v-if="errors.password" class="error-msg">{{ errors.password }}</span>
+              </div>
+            </Transition>
 
           </div>
 
           <div class="modal-footer">
-            <button type="button" class="btn-cancel" @click="closeModal">Cancel</button>
-            <button type="submit" class="btn-save" :disabled="saving">
-              <span v-if="saving" class="spinner"></span>
-              <span v-else><i class="ti ti-check"></i> {{ editing ? 'Save changes' : 'Add Employee' }}</span>
-            </button>
+
+            <!-- Confirm delete — takes full row -->
+            <template v-if="editing && confirmDelete">
+              <div class="confirm-zone">
+                <span class="confirm-text">Remove this employee?</span>
+                <button type="button" class="btn-confirm-delete" :disabled="deleting" @click="handleDelete">
+                  <span v-if="deleting" class="spinner"></span>
+                  <span v-else>Yes, delete</span>
+                </button>
+                <button type="button" class="btn-cancel-delete" @click="confirmDelete = false">Cancel</button>
+              </div>
+            </template>
+
+            <!-- Normal footer -->
+            <template v-else>
+              <div class="footer-left">
+                <button v-if="editing" type="button" class="btn-delete" @click="confirmDelete = true">
+                  <i class="ti ti-trash"></i> Delete
+                </button>
+              </div>
+              <div class="footer-right">
+                <button type="button" class="btn-cancel" @click="closeModal">Cancel</button>
+                <button type="submit" class="btn-save" :disabled="saving">
+                  <span v-if="saving" class="spinner"></span>
+                  <span v-else><i class="ti ti-check"></i> {{ editing ? 'Save changes' : 'Add Employee' }}</span>
+                </button>
+              </div>
+            </template>
+
           </div>
 
         </form>
@@ -190,25 +262,95 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import AppNavbar from '@/components/AppNavbar.vue'
+import { useAuthStore } from '@/stores/authStore'
+import { useToast } from '@/composables/useToast'
 
 interface Employee {
-  emp_id:    string
-  name:      string
-  role_name: string
-  photoUrl:  string | null
+  empId:    number
+  name:     string
+  role:     string | null
+  isActive: boolean | null
+  createdAt: string | null
 }
 
 interface FormState {
-  emp_id:       string
+  empId:        string
   name:         string
-  role_name:    string
+  role:         string
+  password:     string
   photoFile:    File | null
   photoPreview: string | null
 }
 
-const ROLES = ['Employee', 'Supervisor', 'Manager', 'Admin']
+const BASE_URL = 'http://localhost:5081'
+
+interface RoleOption {
+  roleName: string
+  isSystem: boolean
+}
+
+const auth         = useAuthStore()
+const { show }     = useToast()
+const roles        = ref<RoleOption[]>([])
+const rolesLoading = ref(true)
+const rolesError   = ref(false)
+
+const selectedRole = computed(() =>
+  roles.value.find(r => r.roleName === form.value.role) ?? null
+)
+
+function authHeader(): Record<string, string> {
+  return auth.token ? { Authorization: `Bearer ${auth.token}` } : {}
+}
+
+async function fetchEmployees() {
+  try {
+    const res = await fetch(`${BASE_URL}/api/admin/employees`, {
+      headers: authHeader(),
+    })
+    if (res.ok) {
+      employees.value = await res.json()
+    } else {
+      show(`Failed to load employees (${res.status})`, 'error')
+    }
+  } catch {
+    show('Cannot connect to server — employees unavailable', 'error')
+  }
+}
+
+async function fetchRoles() {
+  rolesLoading.value = true
+  rolesError.value   = false
+  try {
+    const res = await fetch(`${BASE_URL}/api/role`, {
+      headers: authHeader(),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      roles.value = data as RoleOption[]
+    } else {
+      rolesError.value = true
+      show(`Failed to load roles (${res.status})`, 'error')
+    }
+  } catch {
+    rolesError.value = true
+    show('Cannot connect to server — roles unavailable', 'error')
+  } finally {
+    rolesLoading.value = false
+  }
+}
+
+onMounted(() => {
+  fetchEmployees()
+  fetchRoles()
+  document.addEventListener('mousedown', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousedown', handleClickOutside)
+})
 
 const AVATAR_COLORS = [
   { bg: '#DBEAFE', color: '#1D4ED8' },
@@ -219,35 +361,48 @@ const AVATAR_COLORS = [
 ]
 
 // --- State ---
-const employees = ref<Employee[]>([
-  { emp_id: 'EMP001', name: 'Supharoke K.',  role_name: 'Employee',   photoUrl: null },
-  { emp_id: 'EMP002', name: 'Nattawut P.',   role_name: 'Manager',    photoUrl: null },
-  { emp_id: 'EMP003', name: 'Malee W.',      role_name: 'Employee',   photoUrl: null },
-  { emp_id: 'EMP004', name: 'Anan T.',       role_name: 'Supervisor', photoUrl: null },
-])
+const employees = ref<Employee[]>([])
 
-const search   = ref('')
-const showModal = ref(false)
-const editing   = ref<Employee | null>(null)
-const saving    = ref(false)
-const focused   = ref<string | null>(null)
-const fileInput = ref<HTMLInputElement | null>(null)
+const search       = ref('')
+const showModal    = ref(false)
+const editing      = ref<Employee | null>(null)
+const saving       = ref(false)
+const focused      = ref<string | null>(null)
+const fileInput    = ref<HTMLInputElement | null>(null)
+const dropdownOpen   = ref(false)
+const dropdownRef    = ref<HTMLElement | null>(null)
+const showPassword   = ref(false)
+const confirmDelete  = ref(false)
+const deleting       = ref(false)
+
+function selectRole(r: string) {
+  form.value.role = r
+  dropdownOpen.value   = false
+}
+
+function handleClickOutside(e: MouseEvent) {
+  if (dropdownRef.value && !dropdownRef.value.contains(e.target as Node)) {
+    dropdownOpen.value = false
+  }
+}
 
 const form = ref<FormState>({
-  emp_id:       '',
+  empId:        '',
   name:         '',
-  role_name:    '',
+  role:         '',
+  password:     '',
   photoFile:    null,
   photoPreview: null,
 })
 
-const errors = ref({ emp_id: '', name: '', role_name: '' })
+const errors = ref({ empId: '', name: '', role: '', password: '', photo: '' })
 
 // --- Computed ---
 const filtered = computed(() => {
   const q = search.value.toLowerCase()
   return employees.value.filter(e =>
-    e.name.toLowerCase().includes(q) || e.emp_id.toLowerCase().includes(q)
+    e.empId !== 1111 &&
+    (e.name.toLowerCase().includes(q) || String(e.empId).includes(q))
   )
 })
 
@@ -255,17 +410,45 @@ const filtered = computed(() => {
 function openModal(emp?: Employee) {
   editing.value = emp ?? null
   if (emp) {
-    form.value = { emp_id: emp.emp_id, name: emp.name, role_name: emp.role_name, photoFile: null, photoPreview: emp.photoUrl }
+    form.value = { empId: String(emp.empId), name: emp.name, role: emp.role ?? '', password: '', photoFile: null, photoPreview: null }
   } else {
-    form.value = { emp_id: '', name: '', role_name: '', photoFile: null, photoPreview: null }
+    form.value = { empId: '', name: '', role: '', password: '', photoFile: null, photoPreview: null }
   }
-  errors.value = { emp_id: '', name: '', role_name: '' }
+  errors.value = { empId: '', name: '', role: '', password: '', photo: '' }
+  showPassword.value = false
   showModal.value = true
 }
 
 function closeModal() {
-  showModal.value = false
-  editing.value = null
+  showModal.value    = false
+  editing.value      = null
+  dropdownOpen.value = false
+  confirmDelete.value = false
+}
+
+async function handleDelete() {
+  if (!editing.value) return
+  deleting.value = true
+  try {
+    const res = await fetch(`http://localhost:5081/api/admin/employees/${editing.value.empId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${auth.token}` },
+    })
+    if (res.status === 204) {
+      employees.value = employees.value.filter(e => e.empId !== editing.value!.empId)
+      show('Employee deleted successfully', 'success')
+      closeModal()
+    } else if (res.status === 404) {
+      show('Employee not found', 'error')
+      confirmDelete.value = false
+    } else {
+      show(`Unexpected error (${res.status})`, 'error')
+    }
+  } catch {
+    show('Cannot connect to server', 'error')
+  } finally {
+    deleting.value = false
+  }
 }
 
 // --- Photo ---
@@ -294,14 +477,19 @@ function removePhoto() {
 
 // --- Validation ---
 function validate(): boolean {
-  errors.value = { emp_id: '', name: '', role_name: '' }
+  errors.value = { empId: '', name: '', role: '', password: '', photo: '' }
   let ok = true
-  if (!form.value.emp_id.trim())    { errors.value.emp_id    = 'Employee ID is required'; ok = false }
-  if (!form.value.name.trim())      { errors.value.name      = 'Full name is required';   ok = false }
-  if (!form.value.role_name)        { errors.value.role_name = 'Please select a role';    ok = false }
+  if (!form.value.empId.trim())  { errors.value.empId = 'Employee ID is required'; ok = false }
+  if (!form.value.name.trim())   { errors.value.name  = 'Full name is required';   ok = false }
+  if (!form.value.role)          { errors.value.role  = 'Please select a role';    ok = false }
+  if (!form.value.photoPreview)  { errors.value.photo = 'Face photo is required';  ok = false }
+  if (selectedRole.value?.isSystem && !form.value.password) {
+    errors.value.password = 'Password is required for system roles'
+    ok = false
+  }
   if (!editing.value) {
-    const dup = employees.value.some(e => e.emp_id === form.value.emp_id.trim())
-    if (dup) { errors.value.emp_id = 'This ID already exists'; ok = false }
+    const dup = employees.value.some(e => e.empId === Number(form.value.empId.trim()))
+    if (dup) { errors.value.empId = 'This ID already exists'; ok = false }
   }
   return ok
 }
@@ -313,38 +501,28 @@ async function handleSubmit() {
 
   try {
     const payload = new FormData()
-    payload.append('emp_id',    form.value.emp_id.trim())
-    payload.append('name',      form.value.name.trim())
-    payload.append('role_name', form.value.role_name)
+    payload.append('empId', form.value.empId.trim())
+    payload.append('name',  form.value.name.trim())
+    payload.append('role',  form.value.role)
+    if (selectedRole.value?.isSystem) payload.append('password', form.value.password)
     if (form.value.photoFile) payload.append('photo', form.value.photoFile)
 
-    // TODO: replace with real API call
-    // const url    = editing.value ? `/api/employees/${form.value.emp_id}` : '/api/employees'
-    // const method = editing.value ? 'PUT' : 'POST'
-    // await fetch(url, { method, body: payload })
+    const res = await fetch(`${BASE_URL}/api/admin/employees`, {
+      method: 'POST',
+      headers: authHeader(),
+      body: payload,
+    })
 
-    await new Promise(r => setTimeout(r, 600)) // simulate
-
-    if (editing.value) {
-      const idx = employees.value.findIndex(e => e.emp_id === editing.value!.emp_id)
-      if (idx !== -1) {
-        employees.value[idx] = {
-          emp_id:    form.value.emp_id.trim(),
-          name:      form.value.name.trim(),
-          role_name: form.value.role_name,
-          photoUrl:  form.value.photoPreview,
-        }
-      }
+    if (res.ok) {
+      show('Employee added successfully', 'success')
+      await fetchEmployees() // refresh list from server
+      closeModal()
     } else {
-      employees.value.unshift({
-        emp_id:    form.value.emp_id.trim(),
-        name:      form.value.name.trim(),
-        role_name: form.value.role_name,
-        photoUrl:  form.value.photoPreview,
-      })
+      const err = await res.json().catch(() => ({}))
+      show(err.message ?? `Error (${res.status})`, 'error')
     }
-
-    closeModal()
+  } catch {
+    show('Cannot connect to server', 'error')
   } finally {
     saving.value = false
   }
@@ -352,7 +530,7 @@ async function handleSubmit() {
 
 // --- Helpers ---
 function initials(name: string): string {
-  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+  return name.split(' ').map(w => w[0] ?? '').slice(0, 2).join('').toUpperCase()
 }
 
 function avatarStyle(name: string) {
@@ -360,7 +538,7 @@ function avatarStyle(name: string) {
   return { background: c.bg, color: c.color }
 }
 
-function roleBadgeClass(role: string) {
+function roleBadgeClass(role: string | null) {
   return {
     'role-admin':      role === 'Admin',
     'role-manager':    role === 'Manager',
@@ -423,7 +601,7 @@ function roleBadgeClass(role: string) {
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); backdrop-filter: blur(2px); z-index: 100; }
 
 /* Modal panel */
-.modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff; border-radius: 16px; width: 100%; max-width: 440px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); z-index: 101; overflow: hidden; }
+.modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff; border-radius: 16px; width: 100%; max-width: 440px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); z-index: 101; }
 
 .modal-header { padding: 20px 24px 0; display: flex; align-items: center; justify-content: space-between; }
 .modal-title { font-size: 16px; font-weight: 700; color: #111827; margin: 0; }
@@ -458,12 +636,54 @@ function roleBadgeClass(role: string) {
 .input { flex: 1; border: none; background: transparent; outline: none; font-size: 14px; color: #111827; padding: 10px 12px 10px 0; min-width: 0; }
 .input::placeholder { color: #D1D5DB; }
 .input:disabled { color: #6B7280; cursor: not-allowed; }
-.select { appearance: none; cursor: pointer; }
-.select-arrow { color: #9CA3AF; font-size: 13px; padding-right: 12px; pointer-events: none; }
+.dropdown { position: relative; }
+.dropdown-trigger { width: 100%; display: flex; align-items: center; border: 1.5px solid #E5E7EB; border-radius: 10px; background: #F9FAFB; padding: 0; cursor: pointer; text-align: left; transition: border-color 0.15s, box-shadow 0.15s; }
+.dropdown.open .dropdown-trigger { border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); background: #fff; }
+.dropdown.error .dropdown-trigger { border-color: #EF4444; }
+.dropdown.open .input-icon { color: #2563EB; }
+.dropdown-placeholder { flex: 1; font-size: 14px; color: #D1D5DB; padding: 10px 0; }
+.dropdown-value       { flex: 1; font-size: 14px; color: #111827; padding: 10px 0; }
+.dropdown-arrow { color: #9CA3AF; font-size: 13px; padding-right: 12px; transition: transform 0.15s; }
+.dropdown.open .dropdown-arrow { transform: rotate(180deg); }
+
+.dropdown-list { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); z-index: 200; overflow: hidden; padding: 4px; }
+.dropdown-item { display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-size: 13px; color: #111827; border-radius: 7px; cursor: pointer; }
+.dropdown-item:hover { background: #F3F4F6; }
+.dropdown-item.selected { background: #EFF6FF; color: #1D4ED8; font-weight: 500; }
+.check-icon { font-size: 13px; color: #2563EB; }
+.system-badge { margin-left: auto; font-size: 10px; font-weight: 600; background: #EDE9FE; color: #5B21B6; padding: 1px 7px; border-radius: 99px; }
+
+.eye-btn { background: none; border: none; cursor: pointer; color: #9CA3AF; padding: 0 12px; font-size: 15px; display: flex; align-items: center; }
+.eye-btn:hover { color: #6B7280; }
+
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s, transform 0.2s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-6px); }
 .error-msg { font-size: 12px; color: #EF4444; }
 
+.roles-state { padding: 10px 14px; gap: 8px; cursor: default; }
+.roles-error { border-color: #FECACA; background: #FEF2F2; }
+.state-icon  { color: #EF4444; font-size: 15px; }
+.state-text  { font-size: 13px; color: #6B7280; flex: 1; }
+.roles-error .state-text { color: #991B1B; }
+.btn-retry   { font-size: 12px; font-weight: 600; color: #2563EB; background: none; border: none; cursor: pointer; padding: 0; flex-shrink: 0; }
+.btn-retry:hover { text-decoration: underline; }
+.spinner-sm  { width: 14px; height: 14px; border: 2px solid #E5E7EB; border-top-color: #2563EB; border-radius: 50%; animation: spin 0.6s linear infinite; flex-shrink: 0; }
+
 /* Footer */
-.modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px; }
+.modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 4px; }
+.footer-left  { display: flex; align-items: center; gap: 8px; }
+.footer-right { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+
+.btn-delete { background: none; border: 1px solid #FECACA; border-radius: 9px; padding: 9px 14px; font-size: 13px; font-weight: 500; color: #EF4444; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.15s; }
+.btn-delete:hover { background: #FEF2F2; border-color: #FCA5A5; }
+
+.confirm-zone { display: flex; align-items: center; gap: 8px; width: 100%; }
+.confirm-text { font-size: 12px; color: #6B7280; white-space: nowrap; }
+.btn-confirm-delete { background: #EF4444; color: #fff; border: none; border-radius: 8px; padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; min-width: 88px; justify-content: center; transition: background 0.15s; }
+.btn-confirm-delete:hover:not(:disabled) { background: #DC2626; }
+.btn-confirm-delete:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-cancel-delete { background: none; border: none; font-size: 12px; color: #6B7280; cursor: pointer; padding: 0; }
+.btn-cancel-delete:hover { color: #374151; }
 .btn-cancel { background: #F3F4F6; border: 1px solid #E5E7EB; border-radius: 9px; padding: 9px 18px; font-size: 13px; font-weight: 500; color: #374151; cursor: pointer; transition: background 0.15s; }
 .btn-cancel:hover { background: #E5E7EB; }
 .btn-save { background: #2563EB; color: #fff; border: none; border-radius: 9px; padding: 9px 20px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 7px; transition: background 0.15s; min-width: 130px; justify-content: center; }
