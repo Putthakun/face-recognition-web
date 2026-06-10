@@ -1,23 +1,7 @@
 <template>
   <div class="employee-page">
 
-    <!-- Navbar -->
-    <nav class="navbar">
-      <div class="brand">
-        <span class="brand-dot"></span>
-        Face recognition attendace system
-      </div>
-      <div class="nav-tabs">
-        <router-link to="/camera"       class="tab" active-class="active"><i class="ti ti-camera"></i> Camera</router-link>
-        <router-link to="/transactions" class="tab" active-class="active"><i class="ti ti-list"></i> Transactions</router-link>
-        <router-link to="/employee"     class="tab" active-class="active"><i class="ti ti-users"></i> Employee</router-link>
-        <router-link to="/monitor"      class="tab" active-class="active"><i class="ti ti-activity"></i> Monitor</router-link>
-      </div>
-      <div class="user-info">
-        <div class="avatar-sm">PK</div>
-        <span>Putthakun</span>
-      </div>
-    </nav>
+    <AppNavbar />
 
     <!-- Topbar -->
     <div class="topbar">
@@ -207,6 +191,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import AppNavbar from '@/components/AppNavbar.vue'
 
 interface Employee {
   emp_id:    string
@@ -387,16 +372,6 @@ function roleBadgeClass(role: string) {
 
 <style scoped>
 .employee-page { display: flex; flex-direction: column; height: 100vh; background: #F9FAFB; font-family: var(--vt-font-family-base, sans-serif); }
-
-/* Navbar */
-.navbar { background: #fff; border-bottom: 1px solid #E5E7EB; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 52px; flex-shrink: 0; }
-.brand { font-size: 15px; font-weight: 600; color: #111827; display: flex; align-items: center; gap: 8px; }
-.brand-dot { width: 8px; height: 8px; border-radius: 50%; background: #2563EB; }
-.nav-tabs { display: flex; gap: 2px; }
-.tab { font-size: 13px; padding: 6px 14px; border-radius: 8px; color: #6B7280; text-decoration: none; display: flex; align-items: center; gap: 6px; }
-.tab.active { background: #EFF6FF; color: #1D4ED8; font-weight: 500; }
-.user-info { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #6B7280; }
-.avatar-sm { width: 30px; height: 30px; border-radius: 50%; background: #DBEAFE; color: #1D4ED8; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
 
 /* Topbar */
 .topbar { background: #fff; border-bottom: 1px solid #E5E7EB; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
