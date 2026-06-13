@@ -479,6 +479,16 @@ function removePhoto() {
 function validate(): boolean {
   errors.value = { empId: '', name: '', role: '', password: '', photo: '' }
   let ok = true
+
+  if (editing.value) {
+    // Edit mode — all fields optional, only validate what's filled in
+    if (!form.value.name.trim())  { errors.value.name = 'Full name is required'; ok = false }
+    if (!form.value.role)         { errors.value.role = 'Please select a role';  ok = false }
+    // Password / photo are optional on edit — only update if provided
+    return ok
+  }
+
+  // Create mode — full validation
   if (!form.value.empId.trim())  { errors.value.empId = 'Employee ID is required'; ok = false }
   if (!form.value.name.trim())   { errors.value.name  = 'Full name is required';   ok = false }
   if (!form.value.role)          { errors.value.role  = 'Please select a role';    ok = false }
@@ -487,10 +497,9 @@ function validate(): boolean {
     errors.value.password = 'Password is required for system roles'
     ok = false
   }
-  if (!editing.value) {
-    const dup = employees.value.some(e => e.empId === Number(form.value.empId.trim()))
-    if (dup) { errors.value.empId = 'This ID already exists'; ok = false }
-  }
+  const dup = employees.value.some(e => e.empId === Number(form.value.empId.trim()))
+  if (dup) { errors.value.empId = 'This ID already exists'; ok = false }
+
   return ok
 }
 
@@ -501,25 +510,64 @@ async function handleSubmit() {
 
   try {
     const payload = new FormData()
-    payload.append('empId', form.value.empId.trim())
-    payload.append('name',  form.value.name.trim())
-    payload.append('role',  form.value.role)
-    if (selectedRole.value?.isSystem) payload.append('password', form.value.password)
-    if (form.value.photoFile) payload.append('photo', form.value.photoFile)
 
-    const res = await fetch(`${BASE_URL}/api/admin/employees`, {
-      method: 'POST',
-      headers: authHeader(),
-      body: payload,
-    })
+    if (editing.value) {
+      // PUT — send only changed/filled fields
+      if (form.value.name.trim() !== editing.value.name) {
+        payload.append('name', form.value.name.trim())
+      }
+      if (form.value.role !== (editing.value.role ?? '')) {
+        payload.append('role', form.value.role)
+      }
+      if (form.value.password) {
+        payload.append('password', form.value.password)
+      }
+      if (form.value.photoFile) {
+        payload.append('photo', form.value.photoFile)
+      }
 
-    if (res.ok) {
-      show('Employee added successfully', 'success')
-      await fetchEmployees() // refresh list from server
-      closeModal()
+      const res = await fetch(`${BASE_URL}/api/admin/employees/${editing.value.empId}`, {
+        method: 'PUT',
+        headers: authHeader(),
+        body: payload,
+      })
+
+      if (res.ok) {
+        show('Employee updated successfully', 'success')
+        await fetchEmployees()
+        closeModal()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        if (err.field === 'photo') {
+          errors.value.photo = err.message ?? 'ไม่พบใบหน้าในรูปภาพ กรุณาอัปโหลดรูปภาพที่เห็นใบหน้าชัดเจน'
+        }
+        show(err.message ?? `Error (${res.status})`, 'error')
+      }
     } else {
-      const err = await res.json().catch(() => ({}))
-      show(err.message ?? `Error (${res.status})`, 'error')
+      // POST — create new employee
+      payload.append('empId', form.value.empId.trim())
+      payload.append('name',  form.value.name.trim())
+      payload.append('role',  form.value.role)
+      if (selectedRole.value?.isSystem) payload.append('password', form.value.password)
+      if (form.value.photoFile) payload.append('photo', form.value.photoFile)
+
+      const res = await fetch(`${BASE_URL}/api/admin/employees`, {
+        method: 'POST',
+        headers: authHeader(),
+        body: payload,
+      })
+
+      if (res.ok) {
+        show('Employee added successfully', 'success')
+        await fetchEmployees()
+        closeModal()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        if (err.field === 'photo') {
+          errors.value.photo = err.message ?? 'ไม่พบใบหน้าในรูปภาพ กรุณาอัปโหลดรูปภาพที่เห็นใบหน้าชัดเจน'
+        }
+        show(err.message ?? `Error (${res.status})`, 'error')
+      }
     }
   } catch {
     show('Cannot connect to server', 'error')

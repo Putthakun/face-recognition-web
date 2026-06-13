@@ -1,9 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
 import CameraView from '../views/CameraView.vue'
 import CameraManageView from '../views/CameraManageView.vue'
 import LoginView from '../views/LoginView.vue'
 import EmployeeView from '../views/EmployeeView.vue'
+import TransactionView from '../views/TransactionView.vue'
 import { useToast } from '@/composables/useToast'
 
 const router = createRouter({
@@ -11,8 +11,7 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: HomeView,
+      redirect: '/camera',
     },
     {
       path: '/login',
@@ -35,6 +34,12 @@ const router = createRouter({
       path: '/cameras',
       name: 'cameras',
       component: CameraManageView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/transactions',
+      name: 'transactions',
+      component: TransactionView,
       meta: { requiresAuth: true },
     },
   ],

@@ -1,25 +1,33 @@
-const BASE_URL = 'http://127.0.0.1:8000'
+const STREAM_BASE = 'http://127.0.0.1:8000'
+const API_BASE    = 'http://localhost:5081'
 
-export const STREAM_URL = `${BASE_URL}/stream`
+export const STREAM_URL = `${STREAM_BASE}/stream`
 
 export interface Transaction {
-  id: string | null
-  name: string
-  location: string
-  confidence: number
-  timestamp: Date
+  transactionId: number
+  empId:         number | null
+  empName:       string | null
+  cameraId:      number | null
+  cameraLocation: string | null
+  createdAt:     string
+}
+
+interface ApiResponse {
+  total:    number
+  page:     number
+  pageSize: number
+  items:    Transaction[]
 }
 
 export const getTransactions = async (): Promise<Transaction[]> => {
-  // TODO: replace with real endpoint when ready
-  // const res = await axios.get<Transaction[]>(`${BASE_URL}/transactions`)
-  // return res.data
+  const token = localStorage.getItem('token')
+  const headers: Record<string, string> = token
+    ? { Authorization: `Bearer ${token}` }
+    : {}
 
-  return [
-    { id: '2024120', name: 'Supharoke', location: 'MOON', confidence: 0.97, timestamp: new Date(Date.now() - 1000 * 60 * 0) },
-    { id: '2024123', name: 'Nattawut',  location: 'MOON', confidence: 0.91, timestamp: new Date(Date.now() - 1000 * 60 * 2) },
-    { id: null,      name: 'Unknown',   location: 'MOON', confidence: 0.38, timestamp: new Date(Date.now() - 1000 * 60 * 5) },
-    { id: '2024118', name: 'Malee W.',  location: 'MOON', confidence: 0.88, timestamp: new Date(Date.now() - 1000 * 60 * 8) },
-    { id: '2024115', name: 'Anan T.',   location: 'MOON', confidence: 0.95, timestamp: new Date(Date.now() - 1000 * 60 * 12) },
-  ]
+  const res = await fetch(`${API_BASE}/api/transactions?page=1&pageSize=20&sortDesc=true`, { headers })
+  if (!res.ok) return []
+
+  const data: ApiResponse = await res.json()
+  return data.items
 }

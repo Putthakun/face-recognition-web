@@ -10,7 +10,6 @@
       <router-link to="/transactions" class="tab" active-class="active"><i class="ti ti-list"></i> Transactions</router-link>
       <router-link to="/employee"     class="tab" active-class="active"><i class="ti ti-users"></i> Employee</router-link>
       <router-link to="/cameras"      class="tab" active-class="active"><i class="ti ti-video"></i> Manage Cameras</router-link>
-      <router-link to="/monitor"      class="tab" active-class="active"><i class="ti ti-activity"></i> Monitor</router-link>
     </div>
 
     <div class="user-info">

@@ -39,7 +39,10 @@
                 {{ cam.location }}
               </div>
             </td>
-            <td>
+            <td class="actions-cell">
+              <button class="btn-edit" @click="openModal(cam)">
+                <i class="ti ti-pencil"></i> Edit
+              </button>
               <button class="btn-delete" @click="confirmDelete(cam)">
                 <i class="ti ti-trash"></i> Delete
               </button>
@@ -58,7 +61,7 @@
     <Transition name="modal">
       <div v-if="showModal" class="modal">
         <div class="modal-header">
-          <h3 class="modal-title">Add Camera</h3>
+          <h3 class="modal-title">{{ editing ? 'Edit Camera' : 'Add Camera' }}</h3>
           <button class="modal-close" @click="closeModal"><i class="ti ti-x"></i></button>
         </div>
 
@@ -82,7 +85,7 @@
             <button type="button" class="btn-cancel" @click="closeModal">Cancel</button>
             <button type="submit" class="btn-save" :disabled="saving">
               <span v-if="saving" class="spinner"></span>
-              <span v-else><i class="ti ti-check"></i> Add Camera</span>
+              <span v-else><i class="ti ti-check"></i> {{ editing ? 'Save changes' : 'Add Camera' }}</span>
             </button>
           </div>
         </form>
@@ -139,6 +142,7 @@ const showModal   = ref(false)
 const saving      = ref(false)
 const focused     = ref<string | null>(null)
 const deleteTarget = ref<Camera | null>(null)
+const editing     = ref<Camera | null>(null)
 
 const form   = ref({ location: '' })
 const errors = ref({ location: '' })
@@ -159,14 +163,16 @@ async function fetchCameras() {
   }
 }
 
-function openModal() {
-  form.value   = { location: '' }
+function openModal(cam?: Camera) {
+  editing.value = cam ?? null
+  form.value   = { location: cam?.location ?? '' }
   errors.value = { location: '' }
   showModal.value = true
 }
 
 function closeModal() {
   showModal.value = false
+  editing.value = null
 }
 
 function validate(): boolean {
@@ -180,15 +186,18 @@ async function handleSubmit() {
   if (!validate()) return
   saving.value = true
   try {
-    const res = await fetch(`${BASE_URL}/api/admin/cameras`, {
-      method: 'POST',
+    const url    = editing.value ? `${BASE_URL}/api/admin/cameras/${editing.value.cameraId}` : `${BASE_URL}/api/admin/cameras`
+    const method = editing.value ? 'PUT' : 'POST'
+
+    const res = await fetch(url, {
+      method,
       headers: { ...authHeader(), 'Content-Type': 'application/json' },
       body: JSON.stringify({
         location: form.value.location.trim(),
       }),
     })
     if (res.ok) {
-      show('Camera added successfully', 'success')
+      show(editing.value ? 'Camera updated successfully' : 'Camera added successfully', 'success')
       await fetchCameras()
       closeModal()
     } else {
@@ -258,6 +267,9 @@ onMounted(fetchCameras)
 .empty-row { text-align: center; color: #9CA3AF; padding: 48px 16px !important; }
 .empty-row i { display: block; font-size: 28px; margin-bottom: 8px; }
 
+.actions-cell { display: flex; gap: 8px; }
+.btn-edit { background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 7px; padding: 5px 12px; font-size: 12px; font-weight: 500; color: #2563EB; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.15s; }
+.btn-edit:hover { background: #DBEAFE; }
 .btn-delete { background: #FEF2F2; border: 1px solid #FECACA; border-radius: 7px; padding: 5px 12px; font-size: 12px; font-weight: 500; color: #DC2626; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.15s; }
 .btn-delete:hover { background: #FEE2E2; }
 
