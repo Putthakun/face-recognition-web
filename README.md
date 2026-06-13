@@ -16,7 +16,7 @@
 
 ## Overview
 
-`face-recognition-web` is the management dashboard for the attendance system. Admins and supervisors sign in with a JWT-protected login, manage employees and cameras, and review attendance history — all backed by [`face-recognition-api`](../face-recognition-api).
+`face-recognition-web` is the management dashboard for the attendance system. Admins and supervisors sign in with a JWT-protected login, manage employees and cameras, and review attendance history — all backed by [`face-recognition-api`](https://github.com/Putthakun/face-recognition-api).
 
 ```
 Browser (Vue 3 SPA) ──JWT──▶ face-recognition-api ──▶ SQL Server / Redis
@@ -93,7 +93,7 @@ The router redirects unauthenticated users to `/login` (preserving the intended 
 ### Prerequisites
 
 - Node.js `^20.19.0` or `>=22.12.0`
-- A running [`face-recognition-api`](../face-recognition-api) instance
+- A running [`face-recognition-api`](https://github.com/Putthakun/face-recognition-api) instance
 
 ### Configuration
 
@@ -130,11 +130,11 @@ docker run -p 8080:80 face-recognition-web
 
 ## Related Services
 
-This app is part of a larger system. See [`real-time-face-recognition-attendance-system`](../real-time-face-recognition-attendance-system) for the full architecture overview.
+This app is part of a larger system. See [`real-time-face-recognition-attendance-system`](https://github.com/Putthakun/real-time-face-recognition-attendance-system) for the full architecture overview.
 
 | Repo | Role |
 |---|---|
-| [`face-recognition-api`](../face-recognition-api) | System of record — employees, cameras, transactions, auth |
-| [`face-recognition-edge`](../face-recognition-edge) | Captures video, detects faces (YOLOv8), publishes crops to RabbitMQ |
-| [`face-recognition-server`](../face-recognition-server) | Matches faces (InsightFace), records transactions |
-| [`face-recognition-infra`](../face-recognition-infra) | Shared SQL Server, Redis, RabbitMQ via Docker Compose |
+| [`face-recognition-api`](https://github.com/Putthakun/face-recognition-api) | System of record — employees, cameras, transactions, auth |
+| [`face-recognition-edge`](https://github.com/Putthakun/face-recognition-edge) | Captures video, detects faces (YOLOv8), publishes crops to RabbitMQ |
+| [`face-recognition-server`](https://github.com/Putthakun/face-recognition-server) | Matches faces (InsightFace), records transactions |
+| [`face-recognition-infra`](https://github.com/Putthakun/face-recognition-infrastructure) | Shared SQL Server, Redis, RabbitMQ via Docker Compose |
